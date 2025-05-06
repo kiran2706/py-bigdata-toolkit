@@ -2,10 +2,6 @@ from apache_beam import typehints
 from apache_beam.io.gcp.datastore.v1new import types
 from apache_beam.transforms import ParDo, PTransform, Reshuffle
 from apache_beam.io.gcp.datastore.v1new.datastoreio import ReadFromDatastore
-from apache_beam.transforms import DoFn
-from google.cloud import datastore
-from google.cloud.datastore import Entity
-from google.cloud.datastore import Entity
 
 
 @typehints.with_output_types(types.Entity)
