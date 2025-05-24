@@ -15,9 +15,9 @@ from apache_beam.options.pipeline_options import (
 
 # Local Imports
 from dataflow.datastore_mass_deletion.custom_transforms.custom_datastore_io import (
-    CreateDatastoreQuery,
-    CustomReadFromDatastore,
-    BatchDeleteFn,
+    DatastoreQueryBuilder,
+    DatastoreEntityReader,
+    DatastoreEntityBatchDeleter,
 )
 from helper_functions.loggers.logging_utils import configure_logging
 
@@ -117,7 +117,7 @@ def run() -> None:
       2. Optionally filters entities based on custom criteria.
       3. Extracts entity keys for deletion.
       4. Deletes entities in batches.
-      5. Logs deletion statistics and errors.
+      5. Logs deletion statistics.
 
     Runtime parameters are provided via ValueProvider arguments for flexibility.
     """
@@ -130,14 +130,14 @@ def run() -> None:
             pipeline
             | "CreateSeed" >> beam.Create([None])  # Create a seed element to start the pipeline
             | "BuildQuery" >> beam.ParDo(
-                CreateDatastoreQuery(
+                DatastoreQueryBuilder(
                     options.datastore_project,
                     options.datastore_kind,
                     options.query_filter,
                 )
             )
         )
-        entities = datastore_query | "ReadEntities" >> CustomReadFromDatastore()
+        entities = datastore_query | "ReadEntities" >> DatastoreEntityReader()
 
         # Step 2: Filter entities (optional, based on custom logic)
         # TO:DO Implement the filter function to handle custom filtering logic
@@ -160,7 +160,7 @@ def run() -> None:
         # Step 4: Delete entities in batches
         deletion_results = (
             batched_keys
-            | "DeleteKeyBatches" >> beam.ParDo(BatchDeleteFn(options.datastore_project))
+            | "DeleteKeyBatches" >> beam.ParDo(DatastoreEntityBatchDeleter(options.datastore_project))
         )
 
         # Step 5: Log deletion statistics
@@ -168,11 +168,4 @@ def run() -> None:
             deletion_results
             | "CountDeleted" >> beam.CombineGlobally(sum)
             | "LogDeletionStats" >> beam.Map(lambda count: logger.info(f"Total entities deleted: {count}"))
-        )
-
-        # Step 6: Log errors (if any)
-        deletion_errors = beam.pvalue.AsSingleton(deletion_results[BatchDeleteFn.errors])
-        _ = (
-            deletion_errors
-            | "LogErrors" >> beam.Map(lambda error: logger.error(f"Deletion error: {error}"))
         )
